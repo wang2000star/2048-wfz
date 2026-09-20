@@ -252,57 +252,18 @@
     padding: 22px 20px;
   }
   .leaderboard-modal h2 { text-align: center; }
-  .nickname-row {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    margin-bottom: 14px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-  }
-  .nickname-row label {
-    color: rgba(255,255,255,0.6);
-    font-size: 13px;
-    flex-shrink: 0;
-  }
-  .nickname-row input {
-    flex: 1;
-    min-width: 0;
-    padding: 6px 10px;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.15);
-    color: #fff;
-    border-radius: 6px;
-    font-family: inherit;
-    font-size: 13px;
-  }
-  .nickname-row input:focus {
-    outline: none;
-    border-color: #03DAC5;
-  }
-  .nickname-row button {
-    background: #03DAC5;
-    color: #1A1A2E;
-    border: none;
-    padding: 7px 12px;
-    border-radius: 6px;
-    font-weight: 600;
-    font-size: 12px;
-    cursor: pointer;
-    font-family: inherit;
-    flex-shrink: 0;
-  }
   .leaderboard-list {
-    max-height: 320px;
+    max-height: 360px;
     overflow-y: auto;
     margin-bottom: 16px;
+    margin-top: 4px;
   }
   .lb-entry {
     display: grid;
     grid-template-columns: 36px 1fr auto;
     gap: 10px;
     align-items: center;
-    padding: 9px 4px;
+    padding: 10px 4px;
     border-bottom: 1px solid rgba(255,255,255,0.05);
   }
   .lb-entry:last-child { border-bottom: none; }
@@ -315,7 +276,7 @@
   .lb-entry.rank-1 .lb-rank { color: #FFD700; font-size: 15px; }
   .lb-entry.rank-2 .lb-rank { color: #C0C0C0; font-size: 15px; }
   .lb-entry.rank-3 .lb-rank { color: #CD7F32; font-size: 15px; }
-  .lb-name {
+  .lb-mode {
     font-size: 13px;
     color: rgba(255,255,255,0.9);
     font-weight: 500;
@@ -329,7 +290,7 @@
     margin-top: 2px;
   }
   .lb-score {
-    font-size: 15px;
+    font-size: 16px;
     color: #03DAC5;
     font-weight: 700;
     font-family: 'JetBrains Mono', ui-monospace, monospace;
@@ -399,11 +360,6 @@
 <div class="modal-overlay" id="leaderboardModal">
   <div class="modal leaderboard-modal">
     <h2>🏆 我的历史最佳</h2>
-    <div class="nickname-row">
-      <label>昵称</label>
-      <input type="text" id="nicknameInput" maxlength="12" placeholder="匿名玩家">
-      <button id="saveNicknameBtn">保存</button>
-    </div>
     <div class="leaderboard-list" id="leaderboardList"></div>
     <div class="modal-btns">
       <button class="modal-btn primary" id="leaderboardCloseBtn" style="flex:1;">关闭</button>
@@ -941,13 +897,7 @@ function showModal(title, msg, b1, b2, onB1, onB2) {
 function hideModal() { document.getElementById('modal').classList.remove('show'); }
 
 // ====== Leaderboard (local) ======
-function getNickname() {
-  return localStorage.getItem('2048_nickname') || '';
-}
-function setNickname(name) {
-  const trimmed = (name || '').trim().slice(0, 12);
-  localStorage.setItem('2048_nickname', trimmed);
-}
+const MODE_LABELS = ['✋ 手动', '🎲 随机', '🧠 智能'];
 function getLeaderboard() {
   try { return JSON.parse(localStorage.getItem('2048_leaderboard') || '[]'); }
   catch (e) { return []; }
@@ -955,8 +905,7 @@ function getLeaderboard() {
 function addToLeaderboard(s) {
   if (s <= 0) return false;
   const lb = getLeaderboard();
-  const nickname = getNickname() || '匿名玩家';
-  const entry = { score: s, nickname: nickname, timestamp: Date.now() };
+  const entry = { score: s, mode: autoMode, timestamp: Date.now() };
   lb.push(entry);
   lb.sort((a, b) => b.score - a.score);
   const top = lb.slice(0, 10);
@@ -968,9 +917,6 @@ function formatTime(ts) {
   const p = n => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
 function renderLeaderboard() {
   const lb = getLeaderboard();
   const c = document.getElementById('leaderboardList');
@@ -978,20 +924,21 @@ function renderLeaderboard() {
     c.innerHTML = '<div class="lb-empty">还没有记录，玩一局吧！</div>';
     return;
   }
-  c.innerHTML = lb.map((e, i) => `
+  c.innerHTML = lb.map((e, i) => {
+    const modeLabel = MODE_LABELS[e.mode] || '✋ 手动';
+    return `
     <div class="lb-entry rank-${i+1}">
       <div class="lb-rank">#${i+1}</div>
       <div>
-        <div class="lb-name">${escapeHtml(e.nickname)}</div>
+        <div class="lb-mode">${modeLabel}</div>
         <div class="lb-time">${formatTime(e.timestamp)}</div>
       </div>
       <div class="lb-score">${e.score}</div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
 function openLeaderboard() {
   renderLeaderboard();
-  document.getElementById('nicknameInput').value = getNickname();
   document.getElementById('leaderboardModal').classList.add('show');
 }
 function closeLeaderboard() {
@@ -1011,17 +958,6 @@ document.getElementById('newGame').addEventListener('click', resetGame);
 document.getElementById('pauseBtn').addEventListener('click', togglePause);
 document.getElementById('leaderboardBtn').addEventListener('click', openLeaderboard);
 document.getElementById('leaderboardCloseBtn').addEventListener('click', closeLeaderboard);
-document.getElementById('saveNicknameBtn').addEventListener('click', () => {
-  setNickname(document.getElementById('nicknameInput').value);
-  renderLeaderboard();
-});
-document.getElementById('nicknameInput').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') {
-    setNickname(e.target.value);
-    renderLeaderboard();
-    e.target.blur();
-  }
-});
 
 // ====== Init ======
 let resizeT;
