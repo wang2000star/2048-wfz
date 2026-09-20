@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1A1A2E">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>2048 - 离线游戏</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: #1A1A2E;
+    color: #FFFFFF;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+  }
+  .app {
+    width: 100%;
+    max-width: 480px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 8px 16px 12px;
+  }
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 44px;
+    flex-shrink: 0;
+  }
+  .topbar h1 {
+    color: #03DAC5;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+  .scores {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin: 4px 0 12px;
+    flex-shrink: 0;
+  }
+  .score-card {
+    background: #0F3460;
+    border-radius: 12px;
+    padding: 8px 20px;
+    min-width: 100px;
+    text-align: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+  }
+  .score-card .label {
+    color: rgba(255,255,255,0.7);
+    font-size: 11px;
+    letter-spacing: 0.5px;
+  }
+  .score-card .value {
+    color: #FFFFFF;
+    font-size: 24px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+  }
+  .grid-wrap {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+  }
+  .grid-container {
+    background: #16213E;
+    border-radius: 12px;
+    padding: 12px;
+    aspect-ratio: 1 / 1;
+    width: 100%;
+    max-width: 460px;
+    position: relative;
+    touch-action: none;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    gap: 12px;
+    width: 100%;
+    height: 100%;
+  }
+  .cell {
+    background: #1A1A2E;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .tile {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    animation: pop 180ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  @keyframes pop {
+    0% { transform: scale(0); }
+    100% { transform: scale(1); }
+  }
+  .status {
+    text-align: center;
+    margin-top: 10px;
+    color: rgba(255,255,255,0.7);
+    font-size: 13px;
+    min-height: 20px;
+    flex-shrink: 0;
+  }
+  .modes {
+    display: flex;
+    gap: 8px;
+    margin: 6px 0 10px;
+    flex-shrink: 0;
+  }
+  .mode-btn {
+    flex: 1;
+    padding: 10px 0;
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.3);
+    color: #FFFFFF;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+  .mode-btn:active { transform: scale(0.96); }
+  .mode-btn.active {
+    background: #03DAC5;
+    border-color: #03DAC5;
+    color: #1A1A2E;
+    font-weight: 700;
+  }
+  .new-game {
+    background: #0F3460;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 24px;
+    padding: 14px 0;
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0 0 4px;
+    cursor: pointer;
+    font-family: inherit;
+    flex-shrink: 0;
+  }
+  .new-game:active { transform: scale(0.98); }
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 24px;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: #16213E;
+    border-radius: 16px;
+    padding: 28px 24px;
+    width: 100%;
+    max-width: 320px;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  }
+  .modal h2 {
+    color: #03DAC5;
+    margin-bottom: 12px;
+    font-size: 20px;
+  }
+  .modal p {
+    margin-bottom: 20px;
+    color: rgba(255,255,255,0.85);
+    font-size: 15px;
+  }
+  .modal-btns {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
+  .modal-btn {
+    flex: 1;
+    padding: 12px 0;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .modal-btn.primary { background: #03DAC5; color: #1A1A2E; }
+  .modal-btn.secondary { background: rgba(255,255,255,0.12); color: #FFFFFF; }
+  .ai-thinking {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    background: #03DAC5;
+    border-radius: 50%;
+    margin-left: 4px;
+    animation: blink 1s infinite;
+    vertical-align: middle;
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar"><h1>2048</h1></div>
+  <div class="scores">
+    <div class="score-card">
+      <div class="label">分数</div>
+      <div class="value" id="score">0</div>
+    </div>
+    <div class="score-card">
+      <div class="label">最高分</div>
+      <div class="value" id="best">0</div>
+    </div>
+  </div>
+  <div class="grid-wrap">
+    <div class="grid-container" id="gridContainer">
+      <div class="grid" id="grid"></div>
+    </div>
+  </div>
+  <div class="status" id="status">手动模式</div>
+  <div class="modes">
+    <button class="mode-btn active" data-mode="0">✋ 手动</button>
+    <button class="mode-btn" data-mode="1">🎲 随机</button>
+    <button class="mode-btn" data-mode="2">🧠 智能</button>
+  </div>
+  <button class="new-game" id="newGame">🔄 新游戏</button>
+</div>
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h2 id="modalTitle">游戏结束</h2>
+    <p id="modalMsg">最终分数: 0</p>
+    <div class="modal-btns">
+      <button class="modal-btn secondary" id="modalClose">关闭</button>
+      <button class="modal-btn primary" id="modalRestart">再来一局</button>
+    </div>
+  </div>
+</div>
+<script>
+"use strict";
+
+// ====== Game state ======
+const SIZE = 4;
+let grid = emptyGrid();
+let score = 0;
+let bestScore = parseInt(localStorage.getItem('best2048') || '0', 10);
+let gameOver = false;
+let hasWon = false;
+let wonNotified = false;
+let autoMode = 0; // 0=manual, 1=random, 2=smart
+let autoTimer = null;
+
+const TILE_COLORS = {
+  2:'#EEE4DA', 4:'#EDE0C8', 8:'#F2B179', 16:'#F59563',
+  32:'#F67C5F', 64:'#F65E3B', 128:'#EDCF72', 256:'#EDCC61',
+  512:'#EDC850', 1024:'#EDC53F', 2048:'#EDC22E'
+};
+const tileColor = v => TILE_COLORS[v] || '#3C3A32';
+const textColor = v => v <= 4 ? '#776E65' : '#F9F6F2';
+
+function emptyGrid() {
+  return [
+    [0,0,0,0],
+    [0,0,0,0],
+    [0,0,0,0],
+    [0,0,0,0]
+  ];
+}
+
+// ====== Rendering ======
+function renderGrid() {
+  const gridEl = document.getElementById('grid');
+  const containerW = gridEl.clientWidth || 400;
+  const cellSize = (containerW - 36) / 4; // 36 = 3 * 12px gap
+  let html = '';
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      const v = grid[r][c];
+      html += '<div class="cell">';
+      if (v !== 0) {
+        let fs;
+        if (v < 100) fs = cellSize * 0.45;
+        else if (v < 1000) fs = cellSize * 0.38;
+        else if (v < 10000) fs = cellSize * 0.30;
+        else fs = cellSize * 0.24;
+        html += `<div class="tile" style="background:${tileColor(v)};color:${textColor(v)};font-size:${fs.toFixed(1)}px">${v}</div>`;
+      }
+      html += '</div>';
+    }
+  }
+  gridEl.innerHTML = html;
+}
+
+function updateScores() {
+  document.getElementById('score').textContent = score;
+  if (score > bestScore) {
+    bestScore = score;
+    localStorage.setItem('best2048', String(bestScore));
+  }
+  document.getElementById('best').textContent = bestScore;
+}
+
+function setStatus(text, color) {
+  const el = document.getElementById('status');
+  el.textContent = text;
+  el.style.color = color || 'rgba(255,255,255,0.7)';
+}
+
+// ====== Game logic (matches Android Game2048View) ======
+function addRandomTile() {
+  const empty = [];
+  for (let r = 0; r < SIZE; r++)
+    for (let c = 0; c < SIZE; c++)
+      if (grid[r][c] === 0) empty.push([r, c]);
+  if (empty.length === 0) return;
+  const [r, c] = empty[Math.floor(Math.random() * empty.length)];
+  grid[r][c] = Math.random() < 0.9 ? 2 : 4;
+}
+
+// Returns { line, moved, gained }
+function mergeLineLeft(line) {
+  const compacted = line.filter(v => v !== 0);
+  while (compacted.length < SIZE) compacted.push(0);
+  const merged = [0, 0, 0, 0];
+  let mIdx = 0, lineScore = 0, i = 0;
+  while (i < SIZE) {
+    if (compacted[i] === 0) { i++; continue; }
+    if (i + 1 < SIZE && compacted[i] === compacted[i + 1]) {
+      const nv = compacted[i] * 2;
+      merged[mIdx++] = nv;
+      lineScore += nv;
+      if (nv === 2048) hasWon = true;
+      i += 2;
+    } else {
+      merged[mIdx++] = compacted[i];
+      i++;
+    }
+  }
+  let moved = false;
+  for (let j = 0; j < SIZE; j++) {
+    if (line[j] !== merged[j]) { moved = true; break; }
+  }
+  return { line: merged, moved, gained: lineScore };
+}
+
+function moveLeft() {
+  let moved = false, gained = 0;
+  for (let r = 0; r < SIZE; r++) {
+    const res = mergeLineLeft(grid[r]);
+    if (res.moved) moved = true;
+    gained += res.gained;
+    grid[r] = res.line;
+  }
+  return { moved, gained };
+}
+
+function moveRight() {
+  let moved = false, gained = 0;
+  for (let r = 0; r < SIZE; r++) {
+    const rev = [...grid[r]].reverse();
+    const res = mergeLineLeft(rev);
+    if (res.moved) moved = true;
+    gained += res.gained;
+    grid[r] = res.line.reverse();
+  }
+  return { moved, gained };
+}
+
+function moveUp() {
+  let moved = false, gained = 0;
+  for (let c = 0; c < SIZE; c++) {
+    const col = [grid[0][c], grid[1][c], grid[2][c], grid[3][c]];
+    const res = mergeLineLeft(col);
+    if (res.moved) moved = true;
+    gained += res.gained;
+    for (let r = 0; r < SIZE; r++) grid[r][c] = res.line[r];
+  }
+  return { moved, gained };
+}
+
+function moveDown() {
+  let moved = false, gained = 0;
+  for (let c = 0; c < SIZE; c++) {
+    const col = [grid[3][c], grid[2][c], grid[1][c], grid[0][c]];
+    const res = mergeLineLeft(col);
+    if (res.moved) moved = true;
+    gained += res.gained;
+    for (let r = 0; r < SIZE; r++) grid[3 - r][c] = res.line[r];
+  }
+  return { moved, gained };
+}
+
+function canMove() {
+  for (let r = 0; r < SIZE; r++)
+    for (let c = 0; c < SIZE; c++)
+      if (grid[r][c] === 0) return true;
+  for (let r = 0; r < SIZE; r++)
+    for (let c = 0; c < SIZE; c++) {
+      if (c + 1 < SIZE && grid[r][c] === grid[r][c + 1]) return true;
+      if (r + 1 < SIZE && grid[r][c] === grid[r + 1][c]) return true;
+    }
+  return false;
+}
+
+function checkGameState() {
+  if (hasWon && !wonNotified) {
+    wonNotified = true;
+    showModal('达成 2048！', `当前分数: ${score}`, '继续', '再来一局',
+      () => hideModal(),
+      () => resetGame());
+  }
+  if (!canMove()) {
+    gameOver = true;
+    stopAutoPlay();
+    setStatus('游戏结束', 'rgba(255,255,255,0.7)');
+    showModal('游戏结束', `最终分数: ${score}`, '关闭', '再来一局',
+      () => hideModal(),
+      () => resetGame());
+  }
+}
+
+// dir: 0=up, 1=down, 2=left, 3=right
+function doMove(dir) {
+  if (gameOver) return false;
+  let res;
+  if (dir === 0) res = moveUp();
+  else if (dir === 1) res = moveDown();
+  else if (dir === 2) res = moveLeft();
+  else if (dir === 3) res = moveRight();
+  else return false;
+  if (res.moved) {
+    score += res.gained;
+    addRandomTile();
+    updateScores();
+    renderGrid();
+    checkGameState();
+  }
+  return res.moved;
+}
+
+function resetGame() {
+  grid = emptyGrid();
+  score = 0;
+  gameOver = false;
+  hasWon = false;
+  wonNotified = false;
+  hideModal();
+  addRandomTile();
+  addRandomTile();
+  updateScores();
+  renderGrid();
+  startGameWithCurrentMode();
+}
+
+// ====== AI (ported from app/src/main/cpp/ai.cpp) ======
+// Heuristic constants (same as C++)
+const H_LOST_PENALTY = 200000.0;
+const H_MONO_POWER = 4.0;
+const H_MONO_WEIGHT = 47.0;
+const H_SUM_POWER = 3.5;
+const H_SUM_WEIGHT = 11.0;
+const H_MERGES_WEIGHT = 700.0;
+const H_EMPTY_WEIGHT = 270.0;
+const CPROB_THRESH = 0.0001;
+
+function distinctTiles(g) {
+  const s = new Set();
+  for (let r = 0; r < 4; r++)
+    for (let c = 0; c < 4; c++)
+      if (g[r][c] > 0) s.add(g[r][c]);
+  return s.size;
+}
+
+function evalLine(line) {
+  const ranks = line.map(v => v === 0 ? 0 : Math.log2(v));
+  let empty = 0, merges = 0, prev = 0, counter = 0, sum = 0;
+  for (let i = 0; i < 4; i++) {
+    const r = ranks[i];
+    sum += Math.pow(r, H_SUM_POWER);
+    if (r === 0) empty++;
+    else {
+      if (prev === r) counter++;
+      else if (counter > 0) { merges += 1 + counter; counter = 0; }
+      prev = r;
+    }
+  }
+  if (counter > 0) merges += 1 + counter;
+
+  let monoL = 0, monoR = 0;
+  for (let i = 1; i < 4; i++) {
+    if (ranks[i - 1] > ranks[i])
+      monoL += Math.pow(ranks[i - 1], H_MONO_POWER) - Math.pow(ranks[i], H_MONO_POWER);
+    else
+      monoR += Math.pow(ranks[i], H_MONO_POWER) - Math.pow(ranks[i - 1], H_MONO_POWER);
+  }
+  return H_LOST_PENALTY
+    + H_EMPTY_WEIGHT * empty
+    + H_MERGES_WEIGHT * merges
+    - H_MONO_WEIGHT * Math.min(monoL, monoR)
+    - H_SUM_WEIGHT * sum;
+}
+
+function evaluateBoard(g) {
+  let t = 0;
+  for (let r = 0; r < 4; r++) t += evalLine(g[r]);
+  for (let c = 0; c < 4; c++) t += evalLine([g[0][c], g[1][c], g[2][c], g[3][c]]);
+  return t;
+}
+
+// Pure merge (no hasWon mutation) for AI search
+function mergeLineLeftPure(line) {
+  const compacted = line.filter(v => v !== 0);
+  while (compacted.length < 4) compacted.push(0);
+  const merged = [0, 0, 0, 0];
+  let mIdx = 0, i = 0;
+  while (i < 4) {
+    if (compacted[i] === 0) { i++; continue; }
+    if (i + 1 < 4 && compacted[i] === compacted[i + 1]) {
+      merged[mIdx++] = compacted[i] * 2;
+      i += 2;
+    } else {
+      merged[mIdx++] = compacted[i];
+      i++;
+    }
+  }
+  let moved = false;
+  for (let j = 0; j < 4; j++) {
+    if (line[j] !== merged[j]) { moved = true; break; }
+  }
+  return { line: merged, moved };
+}
+
+function simulateMove(g, dir) {
+  const ng = g.map(row => row.slice());
+  let moved = false;
+  if (dir === 2) {
+    for (let r = 0; r < 4; r++) {
+      const res = mergeLineLeftPure(ng[r]);
+      if (res.moved) moved = true;
+      ng[r] = res.line;
+    }
+  } else if (dir === 3) {
+    for (let r = 0; r < 4; r++) {
+      const rev = ng[r].slice().reverse();
+      const res = mergeLineLeftPure(rev);
+      if (res.moved) moved = true;
+      ng[r] = res.line.reverse();
+    }
+  } else if (dir === 0) {
+    for (let c = 0; c < 4; c++) {
+      const col = [ng[0][c], ng[1][c], ng[2][c], ng[3][c]];
+      const res = mergeLineLeftPure(col);
+      if (res.moved) moved = true;
+      for (let r = 0; r < 4; r++) ng[r][c] = res.line[r];
+    }
+  } else {
+    for (let c = 0; c < 4; c++) {
+      const col = [ng[3][c], ng[2][c], ng[1][c], ng[0][c]];
+      const res = mergeLineLeftPure(col);
+      if (res.moved) moved = true;
+      for (let r = 0; r < 4; r++) ng[3 - r][c] = res.line[r];
+    }
+  }
+  return { grid: ng, moved };
+}
+
+function scoreTilechoose(g, cprob, depth, depthLimit, cache) {
+  if (cprob < CPROB_THRESH || depth >= depthLimit) {
+    return evaluateBoard(g);
+  }
+  const key = g[0].join(',') + '|' + g[1].join(',') + '|' + g[2].join(',') + '|' + g[3].join(',');
+  const cached = cache.get(key);
+  if (cached && cached.depth <= depth) return cached.heur;
+
+  let empty = 0;
+  for (let r = 0; r < 4; r++)
+    for (let c = 0; c < 4; c++)
+      if (g[r][c] === 0) empty++;
+  if (empty === 0) return evaluateBoard(g);
+
+  cprob /= empty;
+  let res = 0;
+  for (let r = 0; r < 4; r++) {
+    for (let c = 0; c < 4; c++) {
+      if (g[r][c] === 0) {
+        const g2 = g.map(row => row.slice());
+        g2[r][c] = 2;
+        res += scoreMoveNode(g2, cprob * 0.9, depth, depthLimit, cache) * 0.9;
+        const g4 = g.map(row => row.slice());
+        g4[r][c] = 4;
+        res += scoreMoveNode(g4, cprob * 0.1, depth, depthLimit, cache) * 0.1;
+      }
+    }
+  }
+  res /= empty;
+  if (depth < 15) cache.set(key, { depth, heur: res });
+  return res;
+}
+
+function scoreMoveNode(g, cprob, depth, depthLimit, cache) {
+  let best = 0;
+  const nextDepth = depth + 1;
+  for (let move = 0; move < 4; move++) {
+    const sim = simulateMove(g, move);
+    if (sim.moved) {
+      const s = scoreTilechoose(sim.grid, cprob, nextDepth, depthLimit, cache);
+      if (s > best) best = s;
+    }
+  }
+  return best;
+}
+
+function findBestMove(g) {
+  const dt = distinctTiles(g);
+  // C++ uses max(3, dt - 2); cap at 4 for web performance
+  const depthLimit = Math.min(Math.max(3, dt - 2), 4);
+  const cache = new Map();
+  let best = 0, bestM = -1;
+  for (let move = 0; move < 4; move++) {
+    const sim = simulateMove(g, move);
+    if (sim.moved) {
+      const s = scoreTilechoose(sim.grid, 1.0, 0, depthLimit, cache);
+      if (s > best) {
+        best = s;
+        bestM = move;
+      }
+    }
+  }
+  return bestM;
+}
+
+function randomMove(g) {
+  const valid = [];
+  for (let m = 0; m < 4; m++) {
+    if (simulateMove(g, m).moved) valid.push(m);
+  }
+  if (valid.length === 0) return -1;
+  return valid[Math.floor(Math.random() * valid.length)];
+}
+
+// ====== Auto play ======
+function startAutoPlay(mode) {
+  stopAutoPlay();
+  autoMode = mode;
+  if (mode === 0) {
+    setStatus('手动模式', 'rgba(255,255,255,0.7)');
+    return;
+  }
+  if (mode === 1) {
+    setStatus('随机对弈中...', '#03DAC5');
+  } else if (mode === 2) {
+    setStatus('智能对弈中...', '#03DAC5');
+  }
+  autoTimer = setInterval(() => {
+    if (gameOver) { stopAutoPlay(); return; }
+    let move = -1;
+    if (autoMode === 1) move = randomMove(grid);
+    else if (autoMode === 2) {
+      try { move = findBestMove(grid); }
+      catch (e) { console.error('AI error', e); move = randomMove(grid); }
+    }
+    if (move < 0) return;
+    doMove(move);
+  }, 220);
+}
+
+function stopAutoPlay() {
+  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+}
+
+function startGameWithCurrentMode() {
+  startAutoPlay(autoMode);
+}
+
+// ====== Input ======
+function handleSwipe(dx, dy) {
+  if (gameOver || autoMode !== 0) return;
+  if (Math.abs(dx) > Math.abs(dy)) {
+    if (dx > 24) doMove(3);
+    else if (dx < -24) doMove(2);
+  } else {
+    if (dy > 24) doMove(1);
+    else if (dy < -24) doMove(0);
+  }
+}
+
+let touchStartX = 0, touchStartY = 0, touchStartT = 0;
+const gridContainer = document.getElementById('gridContainer');
+gridContainer.addEventListener('touchstart', (e) => {
+  if (e.touches.length === 1) {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    touchStartT = Date.now();
+  }
+}, { passive: true });
+gridContainer.addEventListener('touchmove', (e) => { e.preventDefault(); }, { passive: false });
+gridContainer.addEventListener('touchend', (e) => {
+  if (e.changedTouches.length === 1) {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+    if (Math.abs(dx) > 20 || Math.abs(dy) > 20) handleSwipe(dx, dy);
+  }
+}, { passive: true });
+
+// Mouse drag for desktop testing
+let mouseDown = false, mouseX = 0, mouseY = 0;
+gridContainer.addEventListener('mousedown', (e) => { mouseDown = true; mouseX = e.clientX; mouseY = e.clientY; });
+window.addEventListener('mouseup', (e) => {
+  if (!mouseDown) return;
+  mouseDown = false;
+  const dx = e.clientX - mouseX, dy = e.clientY - mouseY;
+  if (Math.abs(dx) > 20 || Math.abs(dy) > 20) handleSwipe(dx, dy);
+});
+
+document.addEventListener('keydown', (e) => {
+  if (gameOver || autoMode !== 0) return;
+  const k = e.key;
+  if (k === 'ArrowUp' || k === 'w' || k === 'W') { e.preventDefault(); doMove(0); }
+  else if (k === 'ArrowDown' || k === 's' || k === 'S') { e.preventDefault(); doMove(1); }
+  else if (k === 'ArrowLeft' || k === 'a' || k === 'A') { e.preventDefault(); doMove(2); }
+  else if (k === 'ArrowRight' || k === 'd' || k === 'D') { e.preventDefault(); doMove(3); }
+});
+
+// ====== Modal ======
+function showModal(title, msg, b1, b2, onB1, onB2) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalMsg').textContent = msg;
+  const btn1 = document.getElementById('modalClose');
+  const btn2 = document.getElementById('modalRestart');
+  btn1.textContent = b1;
+  btn2.textContent = b2;
+  btn1.onclick = onB1;
+  btn2.onclick = onB2;
+  document.getElementById('modal').classList.add('show');
+}
+function hideModal() { document.getElementById('modal').classList.remove('show'); }
+
+// ====== Mode + new game ======
+document.querySelectorAll('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    autoMode = parseInt(btn.dataset.mode, 10);
+    startGameWithCurrentMode();
+  });
+});
+document.getElementById('newGame').addEventListener('click', resetGame);
+
+// ====== Init ======
+let resizeT;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeT);
+  resizeT = setTimeout(renderGrid, 50);
+});
+// Initial render after layout
+requestAnimationFrame(() => {
+  updateScores();
+  resetGame();
+});
+</script>
+</body>
+</html>
