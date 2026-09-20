@@ -119,14 +119,33 @@
     0% { transform: scale(0); }
     100% { transform: scale(1); }
   }
-  .status {
-    text-align: center;
+  .status-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
     margin-top: 10px;
-    color: rgba(255,255,255,0.7);
-    font-size: 13px;
-    min-height: 20px;
+    min-height: 24px;
     flex-shrink: 0;
   }
+  .status {
+    color: rgba(255,255,255,0.7);
+    font-size: 13px;
+  }
+  .pause-btn {
+    background: rgba(3,218,197,0.15);
+    border: 1px solid #03DAC5;
+    color: #03DAC5;
+    border-radius: 14px;
+    padding: 4px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    display: none;
+  }
+  .pause-btn.show { display: inline-block; }
+  .pause-btn:active { transform: scale(0.95); }
   .modes {
     display: flex;
     gap: 8px;
@@ -247,7 +266,10 @@
       <div class="grid" id="grid"></div>
     </div>
   </div>
-  <div class="status" id="status">手动模式</div>
+  <div class="status-row">
+    <span class="status" id="status">手动模式</span>
+    <button class="pause-btn" id="pauseBtn">⏸ 暂停</button>
+  </div>
   <div class="modes">
     <button class="mode-btn active" data-mode="0">✋ 手动</button>
     <button class="mode-btn" data-mode="1">🎲 随机</button>
@@ -278,6 +300,7 @@ let hasWon = false;
 let wonNotified = false;
 let autoMode = 0; // 0=manual, 1=random, 2=smart
 let autoTimer = null;
+let isPaused = false;
 
 const TILE_COLORS = {
   2:'#EEE4DA', 4:'#EDE0C8', 8:'#F2B179', 16:'#F59563',
@@ -442,6 +465,7 @@ function checkGameState() {
     gameOver = true;
     stopAutoPlay();
     setStatus('游戏结束', 'rgba(255,255,255,0.7)');
+    updatePauseButton();
     showModal('游戏结束', `最终分数: ${score}`, '关闭', '再来一局',
       () => hideModal(),
       () => resetGame());
@@ -671,6 +695,8 @@ function randomMove(g) {
 function startAutoPlay(mode) {
   stopAutoPlay();
   autoMode = mode;
+  isPaused = false;
+  updatePauseButton();
   if (mode === 0) {
     setStatus('手动模式', 'rgba(255,255,255,0.7)');
     return;
@@ -695,6 +721,32 @@ function startAutoPlay(mode) {
 
 function stopAutoPlay() {
   if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+}
+
+function updatePauseButton() {
+  const btn = document.getElementById('pauseBtn');
+  if (!btn) return;
+  if (autoMode === 0 || gameOver) {
+    btn.classList.remove('show');
+    return;
+  }
+  btn.classList.add('show');
+  btn.textContent = isPaused ? '▶ 继续' : '⏸ 暂停';
+}
+
+function togglePause() {
+  if (autoMode === 0 || gameOver) return;
+  if (isPaused) {
+    // resume
+    startAutoPlay(autoMode);
+  } else {
+    // pause
+    stopAutoPlay();
+    isPaused = true;
+    const label = autoMode === 1 ? '随机' : '智能';
+    setStatus(label + '对弈 已暂停', 'rgba(255,255,255,0.5)');
+    updatePauseButton();
+  }
 }
 
 function startGameWithCurrentMode() {
@@ -774,6 +826,7 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
   });
 });
 document.getElementById('newGame').addEventListener('click', resetGame);
+document.getElementById('pauseBtn').addEventListener('click', togglePause);
 
 // ====== Init ======
 let resizeT;
